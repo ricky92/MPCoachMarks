@@ -73,18 +73,21 @@ typedef NS_ENUM(NSInteger, ContinueLocation) {
 @property (nonatomic, strong) NSArray *coachMarks;
 @property (nonatomic, strong) UILabel *lblCaption;
 @property (nonatomic, strong) UIColor *maskColor;
-@property (nonatomic, strong) UILabel *lblContinue;
+@property (nonatomic, strong) UIButton *btnContinue;
 @property (nonatomic, strong) UIButton *btnSkipCoach;
 @property (nonatomic) CGFloat animationDuration;
 @property (nonatomic) CGFloat cutoutRadius;
 @property (nonatomic) CGFloat maxLblWidth;
 @property (nonatomic) CGFloat lblSpacing;
-@property (nonatomic) BOOL enableContinueLabel;
+@property (nonatomic) BOOL enableContinueButton;
 @property (nonatomic) BOOL enableSkipButton;
-@property (nonatomic, copy) NSString *continueLabelText;
+@property (nonatomic, copy) NSString *continueButtonText;
 @property (nonatomic, copy) NSString *skipButtonText;
+@property (nonatomic) UIColor *continueButtonColor;
+@property (nonatomic) UIColor *skipButtonColor;
 @property (nonatomic) ContinueLocation continueLocation;
 @property (nonatomic, strong) UIImageView *arrowImage;
+@property (nonatomic) BOOL enableTap;
 
 - (id)initWithFrame:(CGRect)frame coachMarks:(NSArray *)marks;
 - (void)start;
@@ -100,6 +103,7 @@ typedef NS_ENUM(NSInteger, ContinueLocation) {
 - (void)coachMarksViewWillCleanup:(MPCoachMarks *)coachMarksView;
 - (void)coachMarksViewDidCleanup:(MPCoachMarks *)coachMarksView;
 - (void)coachMarksViewDidClicked:(MPCoachMarks *)coachMarksView atIndex:(NSInteger)index;
+- (void)coachMarksViewContinueButtonClicked:(MPCoachMarks *)coachMarksView;
 - (void)coachMarksViewSkipButtonClicked:(MPCoachMarks *)coachMarksView;
 
 @end

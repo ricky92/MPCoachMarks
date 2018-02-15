@@ -37,19 +37,22 @@ NSString *const kContinueLabelText = @"Tap to continue";
 @synthesize delegate;
 @synthesize coachMarks;
 @synthesize lblCaption;
-@synthesize lblContinue;
+@synthesize btnContinue;
 @synthesize btnSkipCoach;
 @synthesize maskColor = _maskColor;
 @synthesize animationDuration;
 @synthesize cutoutRadius;
 @synthesize maxLblWidth;
 @synthesize lblSpacing;
-@synthesize enableContinueLabel;
+@synthesize enableContinueButton;
 @synthesize enableSkipButton;
-@synthesize continueLabelText;
+@synthesize continueButtonText;
 @synthesize skipButtonText;
+@synthesize continueButtonColor;
+@synthesize skipButtonColor;
 @synthesize arrowImage;
 @synthesize continueLocation;
+@synthesize enableTap;
 
 #pragma mark - Methods
 
@@ -58,7 +61,7 @@ NSString *const kContinueLabelText = @"Tap to continue";
     if (self) {
         // Save the coach marks
         self.coachMarks = marks;
-        
+
         // Setup
         [self setup];
     }
@@ -89,21 +92,21 @@ NSString *const kContinueLabelText = @"Tap to continue";
     self.cutoutRadius = kCutoutRadius;
     self.maxLblWidth = kMaxLblWidth;
     self.lblSpacing = kLblSpacing;
-    self.enableContinueLabel = kEnableContinueLabel;
+    self.enableContinueButton = kEnableContinueLabel;
     self.enableSkipButton = kEnableSkipButton;
-    self.continueLabelText = kContinueLabelText;
+    self.continueButtonText = kContinueLabelText;
     self.skipButtonText = kSkipButtonText;
-    
+
     // Shape layer mask
     mask = [CAShapeLayer layer];
     [mask setFillRule:kCAFillRuleEvenOdd];
     [mask setFillColor:[[UIColor colorWithHue:0.0f saturation:0.0f brightness:0.0f alpha:kMaskAlpha] CGColor]];
     [self.layer addSublayer:mask];
-    
+
     // Capture touches
     UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(userDidTap:)];
     [self addGestureRecognizer:tapGestureRecognizer];
-    
+
     // Captions
     self.lblCaption = [[UILabel alloc] initWithFrame:(CGRect){{0.0f, 0.0f}, {self.maxLblWidth, 0.0f}}];
     self.lblCaption.backgroundColor = [UIColor clearColor];
@@ -115,9 +118,15 @@ NSString *const kContinueLabelText = @"Tap to continue";
     self.lblCaption.alpha = 0.0f;
     [self addSubview:self.lblCaption];
     
+    // Default button colors
+    self.continueButtonColor = [UIColor darkGrayColor];
+    self.skipButtonColor = [UIColor darkGrayColor];
+
     //Location Position
     self.continueLocation = LOCATION_BOTTOM;
-    
+
+    self.enableTap = YES;
+
     // Hide until unvoked
     self.hidden = YES;
 }
@@ -128,17 +137,17 @@ NSString *const kContinueLabelText = @"Tap to continue";
     // Define shape
     UIBezierPath *maskPath = [UIBezierPath bezierPathWithRect:self.bounds];
     UIBezierPath *cutoutPath;
-    
+
     if (shape == SHAPE_CIRCLE)
         cutoutPath = [UIBezierPath bezierPathWithOvalInRect:rect];
     else if (shape == SHAPE_SQUARE)
         cutoutPath = [UIBezierPath bezierPathWithRect:rect];
     else
         cutoutPath = [UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:self.cutoutRadius];
-    
-    
+
+
     [maskPath appendPath:cutoutPath];
-    
+
     // Set the new path
     mask.path = maskPath.CGPath;
 }
@@ -147,20 +156,20 @@ NSString *const kContinueLabelText = @"Tap to continue";
     // Define shape
     UIBezierPath *maskPath = [UIBezierPath bezierPathWithRect:self.bounds];
     UIBezierPath *cutoutPath;
-    
+
     if (shape == SHAPE_CIRCLE)
         cutoutPath = [UIBezierPath bezierPathWithOvalInRect:rect];
     else if (shape == SHAPE_SQUARE)
         cutoutPath = [UIBezierPath bezierPathWithRect:rect];
     else
         cutoutPath = [UIBezierPath bezierPathWithRoundedRect:rect cornerRadius:self.cutoutRadius];
-    
-    
+
+
     [maskPath appendPath:cutoutPath];
-    
+
     // Animate it
     CABasicAnimation *anim = [CABasicAnimation animationWithKeyPath:@"path"];
-    anim.delegate = self;
+    anim.delegate = nil;
     anim.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseOut];
     anim.duration = self.animationDuration;
     anim.fromValue = (__bridge id)(mask.path);
@@ -180,7 +189,8 @@ NSString *const kContinueLabelText = @"Tap to continue";
 
 - (void)userDidTap:(UITapGestureRecognizer *)recognizer {
     // Go to the next coach mark
-    [self goToCoachMarkIndexed:(markIndex+1)];
+    if (self.enableTap)
+      [self goToCoachMarkIndexed:(markIndex+1)];
 }
 
 #pragma mark - Navigation
@@ -203,14 +213,23 @@ NSString *const kContinueLabelText = @"Tap to continue";
     [self cleanup:NO];
 }
 
-- (void)skipCoach {
+- (void)tapSkipCoach {
     if ([self.delegate respondsToSelector:@selector(coachMarksViewSkipButtonClicked:)]) {
         [self.delegate coachMarksViewSkipButtonClicked:self];
     }
     [self goToCoachMarkIndexed:self.coachMarks.count];
 }
 
+- (void)tapContinue {
+    if ([self.delegate respondsToSelector:@selector(coachMarksViewContinueButtonClicked:)]) {
+        [self.delegate coachMarksViewContinueButtonClicked:self];
+    }
+    [self goToCoachMarkIndexed:markIndex+1];
+}
+
 - (void)handleSingleTap:(UITapGestureRecognizer *)recognizer {
+    if (!self.enableTap)
+      return;
     [self.delegate coachMarksViewDidClicked:self atIndex:markIndex];
     [self cleanup:YES];
 }
@@ -231,20 +250,20 @@ NSString *const kContinueLabelText = @"Tap to continue";
         [self cleanup:YES];
         return;
     }
-    
+
     // Current index
     markIndex = index;
-    
+
     // Coach mark definition
     NSDictionary *markDef = [self.coachMarks objectAtIndex:index];
     NSString *markCaption = [markDef objectForKey:@"caption"];
     CGRect markRect = [[markDef objectForKey:@"rect"] CGRectValue];
-    
+
     MaskShape shape = DEFAULT;
     if([[markDef allKeys] containsObject:@"shape"])
         shape = [[markDef objectForKey:@"shape"] integerValue];
-    
-    
+
+
     //Label Position
     LabelAligment labelAlignment = [[markDef objectForKey:@"alignment"] integerValue];
     LabelPosition labelPosition = [[markDef objectForKey:@"position"] integerValue];
@@ -253,7 +272,7 @@ NSString *const kContinueLabelText = @"Tap to continue";
     } else {
         self.cutoutRadius = kCutoutRadius;
     }
-    
+
     if ([self.delegate respondsToSelector:@selector(coachMarksViewDidClicked:atIndex:)]) {
         [currentView removeFromSuperview];
         currentView = [[UIView alloc] initWithFrame:markRect];
@@ -264,15 +283,15 @@ NSString *const kContinueLabelText = @"Tap to continue";
         [currentView addGestureRecognizer:singleFingerTap];
         [self addSubview:currentView];
     }
-    
-    
-    
+
+
+
     [self.arrowImage removeFromSuperview];
     BOOL showArrow = NO;
     if( [markDef objectForKey:@"showArrow"])
         showArrow = [[markDef objectForKey:@"showArrow"] boolValue];
-    
-    
+
+
     // Calculate the caption position and size
     self.lblCaption.alpha = 0.0f;
     self.lblCaption.frame = (CGRect){{0.0f, 0.0f}, {self.maxLblWidth, 0.0f}};
@@ -280,8 +299,8 @@ NSString *const kContinueLabelText = @"Tap to continue";
     [self.lblCaption sizeToFit];
     CGFloat y;
     CGFloat x;
-    
-    
+
+
     //Label Aligment and Position
     switch (labelAlignment) {
         case LABEL_ALIGNMENT_RIGHT:
@@ -294,7 +313,7 @@ NSString *const kContinueLabelText = @"Tap to continue";
             x = floorf((self.bounds.size.width - self.lblCaption.frame.size.width) / 2.0f);
             break;
     }
-    
+
     switch (labelPosition) {
         case LABEL_POSITION_TOP:
         {
@@ -330,7 +349,7 @@ NSString *const kContinueLabelText = @"Tap to continue";
             y = markRect.origin.y + markRect.size.height/2 - self.lblCaption.frame.size.height/2;
             x = markRect.origin.x + markRect.size.width + kLabelMargin;
             if(showArrow) {
-                
+
             }
         }
             break;
@@ -391,60 +410,82 @@ NSString *const kContinueLabelText = @"Tap to continue";
         }
             break;
     }
-    
+
     // Animate the caption label
     self.lblCaption.frame = (CGRect){{x, y}, self.lblCaption.frame.size};
-    
+    [self.lblCaption setTranslatesAutoresizingMaskIntoConstraints:YES];
+
     [UIView animateWithDuration:0.3f animations:^{
         self.lblCaption.alpha = 1.0f;
     }];
-    
+
     // Delegate (coachMarksView:willNavigateTo:atIndex:)
     if ([self.delegate respondsToSelector:@selector(coachMarksView:willNavigateToIndex:)]) {
         [self.delegate coachMarksView:self willNavigateToIndex:markIndex];
     }
-    
+
     // If first mark, set the cutout to the center of first mark
     if (markIndex == 0) {
         CGPoint center = CGPointMake(floorf(markRect.origin.x + (markRect.size.width / 2.0f)), floorf(markRect.origin.y + (markRect.size.height / 2.0f)));
         CGRect centerZero = (CGRect){center, CGSizeZero};
         [self setCutoutToRect:centerZero withShape:shape];
     }
-    
+
     // Animate the cutout
     [self animateCutoutToRect:markRect withShape:shape];
-    
-    CGFloat lblContinueWidth = self.enableSkipButton ? (70.0/100.0) * self.bounds.size.width : self.bounds.size.width;
-    CGFloat btnSkipWidth = self.bounds.size.width - lblContinueWidth;
-    
+
     // Show continue lbl if first mark
-    if (self.enableContinueLabel) {
+    if (self.enableContinueButton) {
         if (markIndex == 0) {
-            lblContinue = [[UILabel alloc] initWithFrame:(CGRect){{0, [self yOriginForContinueLabel]}, {lblContinueWidth, 30.0f}}];
-            lblContinue.font = [UIFont boldSystemFontOfSize:13.0f];
-            lblContinue.textAlignment = NSTextAlignmentCenter;
-            lblContinue.text = self.continueLabelText;
-            lblContinue.alpha = 0.0f;
-            lblContinue.backgroundColor = [UIColor whiteColor];
-            [self addSubview:lblContinue];
+            btnContinue = [[UIButton alloc] init];
+            [btnContinue addTarget:self action:@selector(tapContinue) forControlEvents:UIControlEventTouchUpInside];
+            btnContinue.titleLabel.font = [UIFont boldSystemFontOfSize:18.0f];
+            btnContinue.titleLabel.textAlignment = NSTextAlignmentCenter;
+            [btnContinue setTitle: self.continueButtonText forState:UIControlStateNormal];
+            btnContinue.alpha = 0.0f;
+            btnContinue.tintColor = [UIColor whiteColor];
+            btnContinue.backgroundColor = continueButtonColor;
+            [btnContinue sizeToFit];
+            [btnContinue setTranslatesAutoresizingMaskIntoConstraints:NO];
+            [self addSubview:btnContinue];
+            
+            btnContinue.contentEdgeInsets = UIEdgeInsetsMake(16, 16, 16, 16);
+            
+            btnContinue.layer.cornerRadius = 8;
+            
+            [btnContinue.centerXAnchor constraintEqualToAnchor: lblCaption.centerXAnchor].active = YES;
+            [btnContinue.topAnchor constraintEqualToAnchor: lblCaption.bottomAnchor constant: 16].active = YES;
+            
             [UIView animateWithDuration:0.3f delay:1.0f options:0 animations:^{
-                lblContinue.alpha = 1.0f;
+                btnContinue.alpha = 1.0f;
             } completion:nil];
-        } else if (markIndex > 0 && lblContinue != nil) {
+        } else if (markIndex > 0 && btnContinue != nil) {
             // Otherwise, remove the lbl
-            [lblContinue removeFromSuperview];
-            lblContinue = nil;
+            [btnContinue removeFromSuperview];
+            btnContinue = nil;
         }
     }
-    
+
     if (self.enableSkipButton && markIndex == 0) {
-        btnSkipCoach = [[UIButton alloc] initWithFrame:(CGRect){{lblContinueWidth, [self yOriginForContinueLabel]}, {btnSkipWidth, 30.0f}}];
-        [btnSkipCoach addTarget:self action:@selector(skipCoach) forControlEvents:UIControlEventTouchUpInside];
+        btnSkipCoach = [[UIButton alloc] init];
+        [btnSkipCoach addTarget:self action:@selector(tapSkipCoach) forControlEvents:UIControlEventTouchUpInside];
+        btnSkipCoach.titleLabel.font = [UIFont boldSystemFontOfSize:18.0f];
+        btnSkipCoach.titleLabel.textAlignment = NSTextAlignmentCenter;
         [btnSkipCoach setTitle:self.skipButtonText forState:UIControlStateNormal];
-        btnSkipCoach.titleLabel.font = [UIFont boldSystemFontOfSize:13.0f];
         btnSkipCoach.alpha = 0.0f;
         btnSkipCoach.tintColor = [UIColor whiteColor];
+        btnSkipCoach.backgroundColor = skipButtonColor;
+        [btnSkipCoach sizeToFit];
+        [btnSkipCoach setTranslatesAutoresizingMaskIntoConstraints:NO];
         [self addSubview:btnSkipCoach];
+        
+        btnSkipCoach.contentEdgeInsets = UIEdgeInsetsMake(12, 12, 12, 12);
+        
+        btnSkipCoach.layer.cornerRadius = 8;
+        
+        [btnSkipCoach.centerXAnchor constraintEqualToAnchor:lblCaption.centerXAnchor].active = YES;
+        [btnSkipCoach.topAnchor constraintEqualToAnchor: (self.enableContinueButton ? btnContinue : lblCaption).bottomAnchor constant:16].active = YES;
+        
         [UIView animateWithDuration:0.3f delay:1.0f options:0 animations:^{
             btnSkipCoach.alpha = 1.0f;
         } completion:nil];
@@ -509,7 +550,7 @@ NSString *const kContinueLabelText = @"Tap to continue";
                      completion:^(BOOL finished) {
                          // Remove self
                          [self removeFromSuperview];
-                         
+
                          // Delegate (coachMarksViewDidCleanup:)
                          if ([self.delegate respondsToSelector:@selector(coachMarksViewDidCleanup:)]) {
                              [self.delegate coachMarksViewDidCleanup:self];
@@ -527,4 +568,3 @@ NSString *const kContinueLabelText = @"Tap to continue";
 }
 
 @end
-
